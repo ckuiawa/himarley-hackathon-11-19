@@ -7,8 +7,14 @@ import java.util.Map;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.amazonaws.AmazonServiceException;
+import com.amazonaws.SdkClientException;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.CannedAccessControlList;
+import com.amazonaws.services.s3.model.PutObjectResult;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.himarley.aws.ApiGatewayResponse;
@@ -16,7 +22,6 @@ import com.himarley.model.Identity;
 import com.himarley.model.MarleyPayload;
 import com.himarley.model.Message;
 import com.himarley.util.LambdaUtil;
-import com.himarley.util.ServiceUtil;
 import com.joestelmach.natty.DateGroup;
 import com.joestelmach.natty.Parser;
 
@@ -64,8 +69,10 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 
 						if (scheduleDate != null) {
 							String icsFile = createIcsFile(payload, scheduleDate);
+							if (icsFile != null) {
+								String url = uploadToS3(icsFile, payload);
+							}
 						}
-
 					}
 
 				}
@@ -147,6 +154,53 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 		ical.addEvent(event);
 
 		return Biweekly.write(ical).go();
+	}
+
+
+	protected String uploadToS3(String icsFile, MarleyPayload payload) {
+
+		String email = getIdentityEmail(payload);
+
+        String clientRegion = "us-east-1";
+        String bucketName = "hacks-the-way-uh-huh-i-like-it-ckuiawa";
+        String stringObjKeyName = email + new Date().getTime() + ".ics";
+
+        try {
+            AmazonS3Client s3Client = (AmazonS3Client)AmazonS3ClientBuilder.standard()
+            		.withRegion(clientRegion)
+                    .build();
+
+            // Upload a text string as a new object.
+            PutObjectResult result = s3Client.putObject(bucketName, stringObjKeyName, icsFile);
+            s3Client.setObjectAcl(bucketName, stringObjKeyName, CannedAccessControlList.PublicRead);
+
+
+            String url = s3Client.getResourceUrl(bucketName, stringObjKeyName);
+            return url;
+
+        }
+        catch(AmazonServiceException e) {
+            // The call was transmitted successfully, but Amazon S3 couldn't process
+            // it, so it returned an error response.
+            e.printStackTrace();
+        }
+        catch(SdkClientException e) {
+            // Amazon S3 couldn't be contacted for a response, or the client
+            // couldn't parse the response from Amazon S3.
+            e.printStackTrace();
+        }
+
+        return null;
+	}
+
+	private String getIdentityEmail(MarleyPayload payload) {
+		if (payload != null) {
+			Identity identity = payload.getIdentity();
+			if (identity != null && identity.getEmail() != null) {
+				return identity.getEmail();
+			}
+		}
+		return null;
 	}
 
 

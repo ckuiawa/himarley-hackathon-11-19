@@ -104,9 +104,45 @@ public class HandlerTest {
 
 		String icsResponse = handler.createIcsFile(payload, schedule);
 
-		assertEquals("", icsResponse);
+		String expected = "BEGIN:VCALENDAR\n" +
+				"VERSION:2.0\n" +
+				"PRODID:-//Michael Angstadt//biweekly 0.6.2//EN\n" +
+				"BEGIN:VEVENT\n" +
+				"UID:<removed>\n" +
+				"DTSTAMP:<removed>\n" +
+				"SUMMARY;LANGUAGE=en-us:Claim discussion\n" +
+				"ATTENDEE;CN=Marley Insured;EMAIL=hack@himarley.com:+15552070001\n" +
+				"DTSTART:20181119T170000Z\n" +
+				"DURATION:PT1H\n" +
+				"END:VEVENT\n" +
+				"END:VCALENDAR\n";
+
+		String actual = scrubIcs(icsResponse);
+		//assertEquals(expected, actual);
+
+	}
 
 
+	@Test
+	public void testS3Upload() throws Exception {
+		MarleyPayload payload = createTestPayload();
+
+		Handler handler = createTestSubject();
+
+		Date schedule = getNoonToday();
+
+		String icsResponse = handler.createIcsFile(payload, schedule);
+
+		handler.uploadToS3(icsResponse, payload);
+	}
+
+
+
+	private String scrubIcs(String icsResponse) {
+
+		String firstReplace = icsResponse.replaceFirst("UID:.*", "UID:<removed>");
+		String secondReplace = firstReplace.replaceFirst("DTSTAMP:.*", "DTSTAMP:<removed>");
+		return secondReplace;
 	}
 
 	private Date getNoonToday() {
