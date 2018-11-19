@@ -1,0 +1,22 @@
+
+service: hackstheway
+
+
+provider:
+  name: aws
+  runtime: java8
+  environment:
+    router_host: 'http://b5339dfa.ngrok.io'
+    router_port: '80'
+package:
+  artifact: target/hackstheway-dev.jar
+
+functions:
+  hello:
+    handler: com.serverless.Handler
+    events:
+      - http:
+          path: hackstheway/
+          method: post
+
+
