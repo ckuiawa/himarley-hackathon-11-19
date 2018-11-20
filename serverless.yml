@@ -10,11 +10,11 @@ provider:
     router_host: 'http://b5339dfa.ngrok.io'
     router_port: '80'
     bucket_name: ${ssm:HACK_BUCKET_NAME}
-iamRoleStatements:
-   - Effect: "Allow"
-     Action:
-      - "s3:*"
-     Resource: "*"
+  iamRoleStatements:
+     - Effect: "Allow"
+       Action:
+        - "s3:*"
+       Resource: "*"
 
 package:
   artifact: target/hackstheway-dev.jar
