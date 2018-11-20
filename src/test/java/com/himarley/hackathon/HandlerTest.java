@@ -6,14 +6,12 @@ import static org.junit.Assert.assertNull;
 
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.himarley.aws.ApiGatewayResponse;
 import com.himarley.model.Identity;
 import com.himarley.model.MarleyPayload;
 import com.himarley.model.Message;
@@ -64,6 +62,7 @@ public class HandlerTest {
 //	}
 //
 	@Test
+	@Ignore
 	public void testParseForDateNull() {
 		Handler handler = createTestSubject();
 		Date result = handler.parseForDate(null);
@@ -73,6 +72,7 @@ public class HandlerTest {
 
 
 	@Test
+	@Ignore
 	public void testParseForDateNoDateInInput() {
 		Handler handler = createTestSubject();
 		Date result = handler.parseForDate("Hi there, Marley.  How are you?");
@@ -81,6 +81,7 @@ public class HandlerTest {
 	}
 
 	@Test
+	@Ignore
 	public void testParseForDateTodayAtMidnight() {
 		Handler handler = createTestSubject();
 		String input = "Today at noon.";
@@ -95,6 +96,7 @@ public class HandlerTest {
 
 
 	@Test
+	@Ignore
 	public void testcreateIscFile() throws Exception {
 		MarleyPayload payload = createTestPayload();
 
@@ -124,6 +126,7 @@ public class HandlerTest {
 
 
 	@Test
+	@Ignore
 	public void testS3Upload() throws Exception {
 		MarleyPayload payload = createTestPayload();
 
@@ -182,7 +185,8 @@ public class HandlerTest {
 		operator.setContactNumber("+15555555555");
 		com.himarley.model.Context context = new com.himarley.model.Context();
 		context.setOperator(operator);
-
+		payload.setContext(context);
+		
 		// Request
 		// Request.text
 		Message request = new Message();
@@ -192,5 +196,31 @@ public class HandlerTest {
 
 		return payload;
 	}
-
+	
+	private MarleyPayload createTestPayload(String text) {
+		MarleyPayload payload = createTestPayload();
+		Message request = new Message();
+		request.setText(text);
+		payload.setRequest(request);
+		return payload;
+		
+	}
+	
+	@Test
+	public void testFullProcess()
+	{
+		fullProcess("can we meet tomorrow at 3 pm EST?");
+	}
+	
+	private String fullProcess(String text) {
+		MarleyPayload payload = createTestPayload(text);
+		Handler handler = createTestSubject();
+		
+		String url = handler.processPayload(payload);
+		
+		if (url != null)
+			return url;
+		
+		return null;
+	}
 }
