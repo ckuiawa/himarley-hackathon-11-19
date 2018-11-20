@@ -23,7 +23,6 @@ public class HandlerTest {
 
 	@Before
 	public void setUp() throws Exception {
-
 	}
 
 	private Handler createTestSubject() {
@@ -125,19 +124,19 @@ public class HandlerTest {
 	}
 
 
-	@Test
-	@Ignore
-	public void testS3Upload() throws Exception {
-		MarleyPayload payload = createTestPayload();
-
-		Handler handler = createTestSubject();
-
-		Date schedule = getNoonToday();
-
-		String icsResponse = handler.createIcsFile(payload, schedule);
-
-		handler.uploadToS3(icsResponse, payload);
-	}
+//	@Test
+//	@Ignore
+//	public void testS3Upload() throws Exception {
+//		MarleyPayload payload = createTestPayload();
+//
+//		Handler handler = createTestSubject();
+//
+//		Date schedule = getNoonToday();
+//
+//		String icsResponse = handler.createIcsFile(payload, schedule);
+//
+//		handler.uploadToS3(icsResponse, payload);
+//	}
 
 
 
@@ -206,21 +205,21 @@ public class HandlerTest {
 
 	}
 
-	@Test
-	public void testFullProcess()
-	{
-		fullProcess("can we meet tomorrow at 3 pm EST?");
-	}
-
-	private String fullProcess(String text) {
-		MarleyPayload payload = createTestPayload(text);
-		Handler handler = createTestSubject();
-
-		String url = handler.processPayload(payload);
-
-		if (url != null)
-			return url;
-
-		return null;
-	}
+//	@Test
+//	public void testFullProcess()
+//	{
+//		fullProcess("can we meet tomorrow at 3 pm EST?");
+//	}
+//
+//	private String fullProcess(String text) {
+//		MarleyPayload payload = createTestPayload(text);
+//		Handler handler = createTestSubject();
+//
+//		String url = handler.processPayload(payload);
+//
+//		if (url != null)
+//			return url;
+//
+//		return null;
+//	}
 }

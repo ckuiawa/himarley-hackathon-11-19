@@ -44,7 +44,7 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 
 	private static final Parser parser = new Parser();
 
-	private static final String bucketName = System.getProperty("bucket_name");
+	private static final String bucketName = System.getenv().get("bucket_name");
 
 
 	@Override
