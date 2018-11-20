@@ -4,7 +4,9 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -18,7 +20,6 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectResult;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,14 +36,18 @@ import com.joestelmach.natty.Parser;
 import biweekly.Biweekly;
 import biweekly.ICalendar;
 import biweekly.component.VEvent;
-import biweekly.property.*;
+import biweekly.io.TimezoneAssignment;
+import biweekly.property.Attendee;
+import biweekly.property.Description;
+import biweekly.property.Organizer;
+import biweekly.property.Summary;
 import biweekly.util.Duration;
 
 public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayResponse> {
 
 	private static final Logger log = LogManager.getLogger(Handler.class);
 
-	private static final Parser parser = new Parser();
+	private static final Parser parser = new Parser(TimeZone.getTimeZone("US/Eastern"));
 
 	private static final String bucketName = System.getenv().get("bucket_name");
 
@@ -53,6 +58,9 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 		ObjectMapper objMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
 		MarleyPayload payload = null;
+
+		Locale.setDefault(Locale.US);
+	    TimeZone.setDefault(TimeZone.getTimeZone("US/Eastern"));
 
 		try {
 			log.info("Entering lambda.  Input: " + objMapper.writeValueAsString(input));
@@ -115,7 +123,17 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 				if (scheduleDate != null) {
 					String icsFile = createIcsFile(payload, scheduleDate);
 					if (icsFile != null) {
-						String url = uploadToS3(icsFile, payload);
+
+						String email = getIdentityEmail(payload);
+						long date = new Date().getTime();
+				        String fileName = email + date + ".ics";
+
+						String icsUrl = uploadToS3(icsFile, fileName, "ICS");
+
+						fileName = email + date + ".html";
+						String url = uploadToS3(getHtml(icsUrl), fileName, "HTML");
+
+
 						if(url != null)
 							return url;
 					}
@@ -123,6 +141,30 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 			}
 		}
 		return null;
+	}
+
+	private String getHtml(String icsUrl) {
+
+		StringBuffer html = new StringBuffer();
+		html.append("<!DOCTYPE html>\n");
+		html.append("<html>\n");
+		html.append("<head>\n");
+		html.append("<meta charset=\"UTF-8\">\n");
+
+		html.append("<meta http-equiv=\"refresh\"\n");
+
+		html.append("content=\"0; url=");
+		html.append(icsUrl);
+		html.append("\">\n");
+
+		html.append("<title>Hack's the way, uh huh, uh huh, I like it</title>\n");
+		html.append("</head>\n");
+		html.append("<body>\n");
+
+		html.append("</body>\n");
+		html.append("</html>\n");
+
+		return html.toString();
 	}
 
 	protected Date parseForDate(String incoming) {
@@ -145,8 +187,24 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 		return null;
 	}
 
+	protected void setDefaultTimezone(ICalendar ical) {
+
+	    TimeZone javaTz = TimeZone.getTimeZone("America/New_York");
+	    TimezoneAssignment newYork = TimezoneAssignment.download(javaTz, false);
+
+	    ical.getTimezoneInfo().setDefaultTimezone(newYork);
+
+
+//		TimezoneInfo tzinfo = ical.getTimezoneInfo();
+//		TimezoneAssignment paris = null;
+//		tzinfo.setDefaultTimezone(paris);
+	}
+
 	protected String createIcsFile(MarleyPayload payload, Date scheduleDate) {
+
+
 		ICalendar ical = new ICalendar();
+		setDefaultTimezone(ical);
 		VEvent event = new VEvent();
 		String summaryText = "Claim discussion";
 		Summary summary = event.setSummary(summaryText);
@@ -205,13 +263,9 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 		return icsContents;
 	}
 
-
-	protected String uploadToS3(String icsFile, MarleyPayload payload) {
-
-		String email = getIdentityEmail(payload);
+	protected String uploadToS3(String contents, String fileName, String type) {
 
         String clientRegion = "us-east-1";
-        String stringObjKeyName = email + new Date().getTime() + ".ics";
 
         try {
 
@@ -221,17 +275,23 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 
         	// create calendar type metadata so that links are downloaded when clicked from s3 (vs opened as text)
             ObjectMetadata md = new ObjectMetadata();
-            md.setContentType("text/calendar");
+
+            if ("ICS" == type) {
+	            	md.setContentType("text/calendar");
+            }
+            else {
+            		md.setContentType("text/html");
+            }
 
             // create input stream based on the icsFile content
-            InputStream is = new ByteArrayInputStream( icsFile.getBytes() );
+            InputStream is = new ByteArrayInputStream( contents.getBytes() );
 
             // upload ics file with metadata included
-        	s3Client.putObject(bucketName, stringObjKeyName, is, md);
-        	s3Client.setObjectAcl(bucketName, stringObjKeyName, CannedAccessControlList.PublicRead);
+        	s3Client.putObject(bucketName, fileName, is, md);
+        	s3Client.setObjectAcl(bucketName, fileName, CannedAccessControlList.PublicRead);
 
         	// get and return the s3 URL
-            String url = ((AmazonS3Client)s3Client).getResourceUrl(bucketName, stringObjKeyName);
+            String url = ((AmazonS3Client)s3Client).getResourceUrl(bucketName, fileName);
             return url;
         }
         catch(AmazonServiceException e) {
@@ -248,7 +308,7 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
         return null;
 	}
 
-	private String getIdentityEmail(MarleyPayload payload) {
+	protected String getIdentityEmail(MarleyPayload payload) {
 		if (payload != null) {
 			Identity identity = payload.getIdentity();
 			if (identity != null && identity.getEmail() != null) {
