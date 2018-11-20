@@ -7,7 +7,7 @@ provider:
   runtime: java8
   timeout: 30
   environment:
-    router_host: 'http://b5339dfa.ngrok.io'
+    router_host: ${ssm:LEGACY_ROUTER_HOST}
     router_port: '80'
     bucket_name: ${ssm:HACK_BUCKET_NAME}
   iamRoleStatements:
