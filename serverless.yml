@@ -5,15 +5,23 @@ service: hackstheway
 provider:
   name: aws
   runtime: java8
+  timeout: 30
   environment:
     router_host: 'http://b5339dfa.ngrok.io'
     router_port: '80'
+    bucket_name: ${ssm:HACK_BUCKET_NAME}
+iamRoleStatements:
+   - Effect: "Allow"
+     Action:
+      - "s3:*"
+     Resource: "*"
+
 package:
   artifact: target/hackstheway-dev.jar
 
 functions:
   hello:
-    handler: com.serverless.Handler
+    handler: com.himarley.hackathon.Handler
     events:
       - http:
           path: hackstheway/

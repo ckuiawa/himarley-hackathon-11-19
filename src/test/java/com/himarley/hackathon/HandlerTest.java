@@ -171,7 +171,7 @@ public class HandlerTest {
 		Identity insured = new Identity();
 		insured.setFirst("Marley");
 		insured.setLast("Insured");
-		insured.setEmail("hack@himarley.com");
+		insured.setEmail("unittest@himarley.com");
 		insured.setMobile("+15552070001");
 		payload.setIdentity(insured);
 
@@ -186,7 +186,7 @@ public class HandlerTest {
 		com.himarley.model.Context context = new com.himarley.model.Context();
 		context.setOperator(operator);
 		payload.setContext(context);
-		
+
 		// Request
 		// Request.text
 		Message request = new Message();
@@ -196,31 +196,31 @@ public class HandlerTest {
 
 		return payload;
 	}
-	
+
 	private MarleyPayload createTestPayload(String text) {
 		MarleyPayload payload = createTestPayload();
 		Message request = new Message();
 		request.setText(text);
 		payload.setRequest(request);
 		return payload;
-		
+
 	}
-	
+
 	@Test
 	public void testFullProcess()
 	{
 		fullProcess("can we meet tomorrow at 3 pm EST?");
 	}
-	
+
 	private String fullProcess(String text) {
 		MarleyPayload payload = createTestPayload(text);
 		Handler handler = createTestSubject();
-		
+
 		String url = handler.processPayload(payload);
-		
+
 		if (url != null)
 			return url;
-		
+
 		return null;
 	}
 }

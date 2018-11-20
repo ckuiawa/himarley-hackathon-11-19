@@ -19,6 +19,7 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectResult;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.himarley.aws.ApiGatewayResponse;
@@ -39,9 +40,12 @@ import biweekly.util.Duration;
 
 public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayResponse> {
 
-	private static final Logger LOG = LogManager.getLogger(Handler.class);
+	private static final Logger log = LogManager.getLogger(Handler.class);
 
 	private static final Parser parser = new Parser();
+
+	private static final String bucketName = System.getProperty("bucket_name");
+
 
 	@Override
 	public ApiGatewayResponse handleRequest(Map<String, Object> input, Context context) {
@@ -49,6 +53,13 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 		ObjectMapper objMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
 		MarleyPayload payload = null;
+
+		try {
+			log.info("Entering lambda.  Input: " + objMapper.writeValueAsString(input));
+		} catch (JsonProcessingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 
 		try {
 			if (input != null && input.containsKey("body")) {
@@ -68,9 +79,10 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 
 				// Add event to the payload
 				if(url != null) {
+					log.info("Received S3 bucket URL: " + url);
 					payload.getEvents().add(new Message("Calendar Event: " + url, MessageType.event));
 				}
-				
+
 				// Tells router we have responded.
 				ServiceUtil.serviceResponse(payload);
 
@@ -90,7 +102,7 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 
 		}
 	}
-	
+
 	protected String processPayload(MarleyPayload payload)
 	{
 		Message request = payload.getRequest();
@@ -142,7 +154,7 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 
 		String descDetails = summaryText;
 		String descSummary = "";
-		
+
 		Identity identity = payload.getIdentity();
 		if (identity != null && identity.getFirst() != null && identity.getLast() != null) {
 			String name = identity.getFirst() + " " + identity.getLast();
@@ -150,11 +162,11 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 			Attendee attendee = new Attendee(name, identity.getEmail(), identity.getMobile());
 			attendee.setRsvp(true);
 			event.addAttendee(attendee);
-			
-			descDetails += System.lineSeparator() + "Insured: " + name + 
-					System.lineSeparator() + identity.getEmail() + 
+
+			descDetails += System.lineSeparator() + "Insured: " + name +
+					System.lineSeparator() + identity.getEmail() +
 					System.lineSeparator() + identity.getMobile() + System.lineSeparator();
-			
+
 			descSummary = " will call " + name + " at " + identity.getMobile() + " at " + scheduleDate.toString();
 		}
 
@@ -165,15 +177,15 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 				String name = operator.getFirst() + " " + operator.getLast();
 				Organizer org = new Organizer(name, operator.getEmail());
 				event.setOrganizer(org);
-				
-				descDetails += System.lineSeparator() + "Operator: " + name + 
-						System.lineSeparator() + operator.getEmail() + 
+
+				descDetails += System.lineSeparator() + "Operator: " + name +
+						System.lineSeparator() + operator.getEmail() +
 						System.lineSeparator() + operator.getMobile() + System.lineSeparator();
-				
+
 				descSummary = name + descSummary;
 			}
 		}
-		
+
 		// TODO: Add a description or some other field that
 		// helps both operator and insured (include phone number to call, etc)...
 		descDetails = descSummary + System.lineSeparator() + System.lineSeparator() + descDetails;
@@ -187,7 +199,10 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 
 		ical.addEvent(event);
 
-		return Biweekly.write(ical).go();
+		String icsContents = Biweekly.write(ical).go();
+
+		log.info("Created an ICS file: " + icsContents);
+		return icsContents;
 	}
 
 
@@ -196,7 +211,6 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
 		String email = getIdentityEmail(payload);
 
         String clientRegion = "us-east-1";
-        String bucketName = "hacksthewaybucket"; //"hacks-the-way-uh-huh-i-like-it-ckuiawa";
         String stringObjKeyName = email + new Date().getTime() + ".ics";
 
         try {
@@ -204,18 +218,18 @@ public class Handler implements RequestHandler<Map<String, Object>, ApiGatewayRe
         	AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
             		.withRegion(clientRegion)
                     .build();
-        	
+
         	// create calendar type metadata so that links are downloaded when clicked from s3 (vs opened as text)
             ObjectMetadata md = new ObjectMetadata();
             md.setContentType("text/calendar");
-            
+
             // create input stream based on the icsFile content
             InputStream is = new ByteArrayInputStream( icsFile.getBytes() );
 
             // upload ics file with metadata included
         	s3Client.putObject(bucketName, stringObjKeyName, is, md);
         	s3Client.setObjectAcl(bucketName, stringObjKeyName, CannedAccessControlList.PublicRead);
-        	
+
         	// get and return the s3 URL
             String url = ((AmazonS3Client)s3Client).getResourceUrl(bucketName, stringObjKeyName);
             return url;
